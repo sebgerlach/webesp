@@ -15,18 +15,13 @@
       <div class='header'>
         <button id='connect' type='button' style='display:none;'>Select Device</button>
         <button id='reset' type='button' style='display:none;'>Reset</button>
-        <button id='program' type='button' style='display:none;'>Program</button>
-        <div class='progress' id='progress' style='display:none;'><div></div></div>
-        <div id='commands'>
-          <table>
-            <tr><td>SSID</td><td><input id='PLACEHOLDER_FOR_WIFI_SSID'/></td></tr>
-            <tr><td>Key</td><td><input id='PLACEHOLDER_FOR_WIFI_PASSWORD'/></td></tr>
-            <tr><td>Message</td><td><input id='PLACEHOLDER_FOR_MESSAGE' value='Message'/></td></tr>
-          </table>
-        </div>
+        <div id='progress' style='display:none;'><div id='innerprogress'></div></div>
+        <table>
+          <tr><td>SSID</td><td><input id='PLACEHOLDER_FOR_WIFI_SSID'/></td></tr>
+          <tr><td>Key</td><td><input id='PLACEHOLDER_FOR_WIFI_PASSWORD'/></td></tr>
+          <tr><td>Message</td><td><input id='PLACEHOLDER_FOR_MESSAGE' value='Message'/></td></tr>
+        </table>
         <br/>
-        <button id='reconnect' type='button'>Reconnect</button>
-
       </div>
       <div id='main' class='main'>
         <div id='nowebserial'>

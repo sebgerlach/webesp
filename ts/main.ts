@@ -1,5 +1,8 @@
 /// <reference path='./serial.d.ts'/>
 
+let terminal: Terminal;
+
+
 const DEFAULT_BAUD = 115200;
 const FAST_BAUD = 460800;
 
@@ -44,7 +47,7 @@ class Partition {
 
   async load() : Promise<boolean> {
     this.binary = new Uint8Array(await (await fetch(this.filename)).arrayBuffer());
-    console.log('Loaded '+ this.filename);
+    terminal.print('Loaded '+ this.filename);
 
     const p = utf8Encoder.encode('PLACEHOLDER_FOR');
     for (let k = 0; k < this.binary.length; ++k) {
@@ -107,8 +110,7 @@ class Partition {
       this.patch(this.placeholders[k], (<HTMLInputElement>document.getElementById(k)).value, len);
     }
     return this.binChecksum();
-  }
-  
+  }  
 }
 
 class ESPImage {
@@ -141,11 +143,10 @@ function sleep(ms: number) : Promise<void> {
 
 class CommandWriter {
   buf: Uint8Array;
-  capacity = 1024;
   off = 0;
 
   constructor() {
-    this.buf = new Uint8Array(this.capacity);
+    this.buf = new Uint8Array(1024);
   }
   clear() {
     this.off = 0;
@@ -199,13 +200,12 @@ class CommandWriter {
     return o;
   }
   private ensure(n: number) {
-    if (this.off + n <= this.capacity) return;
-    const nbuf = new Uint8Array(((this.capacity + n + 1023) >> 10) << 10);
-    for (let i = 0; i < this.capacity; ++i) {
+    if (this.off + n <= this.buf.length) return;
+    const nbuf = new Uint8Array(((this.buf.length + n + 1023) >> 10) << 10);
+    for (let i = 0; i < this.buf.length; ++i) {
       nbuf[i] = this.buf[i];
     }
     this.buf = nbuf;
-    this.capacity = this.buf.length;
   }
   u8(v: number) {
     this.ensure(1);
@@ -270,15 +270,13 @@ class PortController {
   writer: WritableStreamDefaultWriter<Uint8Array>|null = null;
   rate: BaudRate = 115200;
 
-  constructor(private port: SerialPort, private target: StreamTarget) {
-
-  }
+  constructor(private port: SerialPort, private target: StreamTarget) {}
 
   async connect(rate: BaudRate) {
     await this.port.open({ baudRate: rate, dataBits: 8, stopBits: 1, bufferSize: 255, parity: 'none', flowControl: 'none' });
     this.connected = true;
     this.rate = rate;
-    console.log("Serial port opened at "+this.rate+" bps.");
+    terminal.print("Serial port opened at "+this.rate+" bps.");
   
     // Start the read loop, keep the promise so we can check later for termination. 
     this.portReader = this.readLoop();
@@ -297,9 +295,9 @@ class PortController {
       this.writer = null;
     }
   
-    await this.portReader;
+    await this.portReader;  // Wait for the read loop to terminate.
     await this.port.close();
-    console.log("Serial port closed.");
+    terminal.print("Serial port closed.");
   }
 
   /**
@@ -365,7 +363,7 @@ class ESPLoader {
 
   async sync() {
     for (let i = 0; i < 10; i++) {
-      console.log("Sync attempt #" + (i+1) + " of 10");
+      terminal.print("Sync attempt #" + (i+1) + " of 10");
 
       await this.sendCommand(Command.ESP_SYNC, new Uint8Array([
         0x07, 0x07, 0x12, 0x20,
@@ -393,12 +391,14 @@ class ESPLoader {
     await sleep(100);
     await this.readChipFamily();
     await this.readEfuses();
-    console.log('Chip family: '+familyNames[this.chipFamily]);
-    console.log('MAC Address: '+this.macAddress.map(value => hex2(value)).join(":"));
+    terminal.print('Chip family: '+familyNames[this.chipFamily]);
+    terminal.print('MAC Address: '+this.macAddress.map(value => hex2(value)).join(":"));
+    document.getElementById('progress')!.style.display = 'block';
     for (let i = 0; i < this.image.partitions.length; ++i) {
-      console.log('Flashing section '+i);
+      terminal.print('Flashing section '+i);
       await this.flashData(this.image.partitions[i].binary, this.image.partitions[i].offset);
     }
+    document.getElementById('progress')!.style.display = 'none';
     await this.port.resetPulse();
     return true;
   }
@@ -455,7 +455,7 @@ class ESPLoader {
   }
 
   async flashData(buf: Uint8Array, off: number) {
-    console.log('Writing '+buf.length+' bytes to 0x'+off.toString(16));
+    terminal.print('Writing '+buf.length+' bytes to 0x'+off.toString(16));
     const blockBits = 9;
     const blockSize = 1 << blockBits;
     const blockCount = (buf.length + blockSize - 1) >> blockBits;
@@ -464,9 +464,12 @@ class ESPLoader {
     await this.command(Command.ESP_FLASH_BEGIN, new CommandWriter().u32(buf.length).u32(blockCount).u32(blockSize).u32(off).get(), 0, 30000 * blockCount * blockSize / 1000000 + 500);
 
     const block = new Uint8Array(blockSize);
+    const progress = document.getElementById('innerprogress')!;
+
     for (let o = 0; o < buf.length; o += blockSize) {
       let cs = 0xef;
       for (let i = 0; i < blockSize; ++i) {
+        progress.style.width = Math.floor(100 * o / buf.length) + "%";
         let v = 0xff;
         if (o+i < buf.length) {
           v = buf[o+i];
@@ -486,7 +489,6 @@ class ESPLoader {
   }
 
   async sendCommand(cmd: Command, buffer: Uint8Array, checksum: number = 0) {
-    console.log('Command '+cmd);
     const s = new CommandWriter();
     s.u8(0x00);
     s.u8(cmd);
@@ -521,7 +523,6 @@ class ESPLoader {
     }
     const v = r[4] + (r[5]<<8) + (r[6]<<16) + (r[7]<<24);
     this.resolveResponse = null;
-    console.log(r.slice(8));
     return new ResponseReader(v, r.slice(8));
   }
 
@@ -534,17 +535,39 @@ class ESPLoader {
   }
 }
 
+const sequences : {[key:string]:string}= {
+  '[0;32m': '<span style="color:#0c0;">',
+  '[0;33m': '<span style="color:#cc0;">',
+  '[0m': '</span>',
+}
+
 class Terminal {
   div: HTMLDivElement;
   constructor(id: string) {
     this.div = <HTMLDivElement>document.getElementById(id);
   }
 
-  write(a: Uint8Array) {
-    
+  write(a: string) {
+    let s = "";
+    let sp = false;
+    for (let i = 0; i < a.length; ++i) {
+      // This is kind of crappy, since it assumes that everything is kind of well formed.
+      if (a.charCodeAt(i) == 27) {
+        for (const k in sequences) {
+          if (a.substr(i+1, k.length) == k) {
+            s += sequences[k]; 
+            i += k.length;
+          }
+        }
+      } else {
+        s += a[i];
+      }
+    }
+    this.div.innerHTML += s + '<br/>';
   }  
 
   print(s: string) {
+    this.div.innerHTML += '<span style="background-color:#444;border:1px solid #ccc; border-radius:3px;">'+ s + '</span><br/>';
     
   }  
 }
@@ -563,16 +586,11 @@ class Controller implements StreamTarget {
     this.connect.addEventListener('click', this.onConnect.bind(this));
     this.reset = <HTMLButtonElement>document.getElementById('reset');
     this.reset.addEventListener('click', this.onReset.bind(this));
-    document.getElementById('reconnect')!.addEventListener('click', this.onReconnect.bind(this));
+    terminal = new Terminal('main');
     if ('serial' in navigator) {
       this.connect.style.display = 'inline';
       document.getElementById('nowebserial')!.style.display = 'none';
-    }
-  }
-
-  async onReconnect() {
-    await this.port!.disconnect();
-    await this.port!.connect(DEFAULT_BAUD);
+    }    
   }
 
   async onConnect() {
@@ -625,7 +643,7 @@ class Controller implements StreamTarget {
         this.frame.clear();
       } else if (data[i] == 13) {
         const str = this.decoder.decode(this.frame.get());
-        console.log('"'+str+'"');
+        terminal.write(str);
         this.frame.clear();
         if (str == 'waiting for download') {
           this.load();
