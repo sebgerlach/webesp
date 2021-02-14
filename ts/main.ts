@@ -590,7 +590,18 @@ class Controller implements StreamTarget {
     if ('serial' in navigator) {
       this.connect.style.display = 'inline';
       document.getElementById('nowebserial')!.style.display = 'none';
-    }    
+    }
+
+    const placeholders = [
+      'PLACEHOLDER_FOR_WIFI_SSID',
+      'PLACEHOLDER_FOR_WIFI_PASSWORD',
+      'PLACEHOLDER_FOR_MESSAGE'];
+    for (const p of placeholders) {
+      const e = <HTMLInputElement>document.getElementById(p);
+      if (localStorage[p]) e.value = localStorage[p];
+      e.addEventListener('change', function() { console.log(p, e); localStorage[p] = e.value; });
+    }
+
   }
 
   async onConnect() {
