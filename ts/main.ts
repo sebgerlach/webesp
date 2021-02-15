@@ -543,13 +543,14 @@ const sequences : {[key:string]:string}= {
 
 class Terminal {
   div: HTMLDivElement;
+  static readonly maxLogs:number = 100;
   constructor(id: string) {
     this.div = <HTMLDivElement>document.getElementById(id);
   }
 
   write(a: string) {
     let s = "";
-    let sp = false;
+    const entry = this.getLogEntryElement();
     for (let i = 0; i < a.length; ++i) {
       // This is kind of crappy, since it assumes that everything is kind of well formed.
       if (a.charCodeAt(i) == 27) {
@@ -563,13 +564,35 @@ class Terminal {
         s += a[i];
       }
     }
-    this.div.innerHTML += s + '<br/>';
-  }  
+    entry.innerHTML += s + '<br/>';
+    this.div.appendChild(entry);
+    this.truncateTerminal();
+    this.scrollTerminal();
+  }
 
   print(s: string) {
-    this.div.innerHTML += '<span style="background-color:#444;border:1px solid #ccc; border-radius:3px;">'+ s + '</span><br/>';
-    
-  }  
+    const entry = this.getLogEntryElement();
+    entry.innerHTML += '<span style="background-color:#444;border:1px solid #ccc; border-radius:3px;">'+ s + '</span><br/>';
+    this.div.appendChild(entry);
+    this.truncateTerminal();
+    this.scrollTerminal();
+  }
+
+  private getLogEntryElement():HTMLSpanElement {
+    const entry = document.createElement('span');
+    entry.classList.add('log-entry');
+    return entry;
+  }
+
+  private truncateTerminal() {
+    while(this.div.children.length > Terminal.maxLogs) {
+      this.div.removeChild(this.div.firstChild as Node);
+    }
+  }
+
+  private scrollTerminal() {
+    this.div.scrollTop = this.div.scrollHeight;
+  }
 }
 
 interface StreamTarget {
