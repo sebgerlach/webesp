@@ -543,7 +543,7 @@ const sequences : {[key:string]:string}= {
 
 class Terminal {
   div: HTMLDivElement;
-  static readonly maxLogs:number = 100;
+  static readonly maxLogs:number = 200;
   constructor(id: string) {
     this.div = <HTMLDivElement>document.getElementById(id);
   }
@@ -564,7 +564,7 @@ class Terminal {
         s += a[i];
       }
     }
-    entry.innerHTML += s + '<br/>';
+    entry.innerHTML = s;
     this.div.appendChild(entry);
     this.truncateTerminal();
     this.scrollTerminal();
@@ -572,14 +572,14 @@ class Terminal {
 
   print(s: string) {
     const entry = this.getLogEntryElement();
-    entry.innerHTML += '<span style="background-color:#444;border:1px solid #ccc; border-radius:3px;">'+ s + '</span><br/>';
+    entry.innerHTML += '<span style="background-color:#444;border:1px solid #ccc; border-radius:3px;">'+ s + '</span>';
     this.div.appendChild(entry);
     this.truncateTerminal();
     this.scrollTerminal();
   }
 
   private getLogEntryElement():HTMLSpanElement {
-    const entry = document.createElement('span');
+    const entry = document.createElement('div');
     entry.classList.add('log-entry');
     return entry;
   }
@@ -649,6 +649,7 @@ class Controller implements StreamTarget {
   }
 
   async onReset() {
+    terminal.print('reset');
     await this.port!.resetPulse();
   }
 
