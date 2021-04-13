@@ -649,7 +649,7 @@ class Controller implements StreamTarget {
   }
 
   async onReset() {
-    terminal.print('reset');
+    terminal.print('Reset');
     await this.port!.resetPulse();
   }
 
