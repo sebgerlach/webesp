@@ -11,3 +11,11 @@ This is still somewhat experimental and there are quite a few rough edges:
 - The terminal support for ANSI escape sequences is limited to what the ESP32
   samples use.
 - Bit rate change doesn't work yet.
+
+## Setup
+
+Install dependencies:  
+$ `npm install`  
+
+Compile and watch Typescript files:  
+$ `npx webpack watch`
